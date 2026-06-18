@@ -22,8 +22,10 @@
                     (배지에 "얼굴을 못 찾았어요"가 뜨면 더 정면·고해상도 사진으로 교체)</li>
                 <li><b>표정만 먼저 테스트</b> — ③번 패널의 <b>😊😢😠😮😨😐 버튼</b>을 눌러보세요.
                     음성 없이도 사진 표정이 즉시 바뀝니다. <b>강도 슬라이더</b>로 변형 세기를 조절합니다.</li>
-                <li><b>목소리로 테스트</b> — ②번 패널의 <b>● 녹음 시작</b> → 2~4초 또렷하게 말하기 → <b>■ 녹음 중지</b>.
-                    추출된 운율 특징(피치·에너지·말속도)과 추정 감정이 ③번에 표시되고 사진 표정이 바뀝니다.</li>
+                <li><b>목소리로 테스트</b> — 두 가지 방법:
+                    <br>· <b>● 녹음 시작</b> → 2~4초 또렷하게 말하기 → <b>■ 녹음 중지</b> (마이크 권한 필요, https/localhost)
+                    <br>· <b>🎵 음성 파일 첨부</b> → wav/mp3/m4a 등 오디오 파일 선택 (마이크·https 불필요, 어디서나 동작)
+                    <br>추출된 운율 특징(피치·에너지·말속도)과 추정 감정이 ③번에 표시되고 사진 표정이 바뀝니다.</li>
             </ol>
 
             <h3>감정 인식 방식 두 가지</h3>
@@ -68,10 +70,14 @@
         <!-- 2. 음성 -->
         <section class="panel">
             <h2>2. 목소리</h2>
+            <p class="hint">마이크로 <b>녹음</b>하거나 오디오 <b>파일을 첨부</b>하세요. (둘 중 편한 방법)</p>
             <div class="row">
                 <button id="recordBtn" class="btn primary">● 녹음 시작</button>
-                <span id="recStatus" class="muted">대기 중</span>
+                <span class="or-sep">또는</span>
+                <label class="btn" for="audioInput">🎵 음성 파일 첨부</label>
+                <input type="file" id="audioInput" accept="audio/*" hidden />
             </div>
+            <div class="row" style="margin-top: 8px"><span id="recStatus" class="muted">대기 중</span></div>
             <div class="meter"><div id="level" class="meter-fill"></div></div>
 
             <details class="opts">

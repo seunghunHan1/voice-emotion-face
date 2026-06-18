@@ -243,16 +243,6 @@ let chunks = [];
 let recognition = null;
 let lastTranscript = "";
 
-// 보안 컨텍스트(https/localhost)가 아니면 마이크 불가 — 안내
-if (!window.isSecureContext) {
-    recordBtn.disabled = true;
-    recordBtn.title = "마이크는 https 또는 localhost에서만 동작합니다";
-    recStatus.innerHTML =
-        '⚠️ 현재 <b>http</b> 접속이라 마이크 녹음이 막혀 있어요. ' +
-        '음성 기능은 <code>localhost</code>나 https에서 사용하세요. ' +
-        '(사진 업로드 + 수동 감정 버튼은 그대로 동작)';
-}
-
 recordBtn.addEventListener("click", async () => {
     if (mediaRecorder && mediaRecorder.state === "recording") {
         mediaRecorder.stop();
@@ -260,9 +250,12 @@ recordBtn.addEventListener("click", async () => {
     }
     let stream;
     try {
+        if (!navigator.mediaDevices?.getUserMedia) throw new Error("no-mic");
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (err) {
-        recStatus.textContent = "마이크 권한이 필요합니다.";
+        recStatus.innerHTML = window.isSecureContext
+            ? "마이크 권한이 필요합니다. 권한을 허용하거나 <b>🎵 음성 파일 첨부</b>를 이용하세요."
+            : "이 주소(http)에선 마이크 녹음이 막혀 있어요. <b>🎵 음성 파일 첨부</b>를 이용하거나 https 주소로 접속하세요.";
         return;
     }
 
@@ -306,6 +299,21 @@ recordBtn.addEventListener("click", async () => {
     recordBtn.textContent = "■ 녹음 중지";
     recStatus.textContent = "녹음 중... (말하고 중지)";
     tick();
+});
+
+// 음성 파일 첨부 → 녹음과 동일 파이프라인 (마이크/보안컨텍스트 불필요)
+document.getElementById("audioInput").addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    lastTranscript = ""; // 업로드 파일은 Web Speech 전사 불가
+    recStatus.textContent = `파일 분석 중... (${file.name})`;
+    try {
+        await analyzeAudio(file); // File 은 Blob 이므로 그대로 사용
+    } catch (err) {
+        console.error(err);
+        recStatus.textContent = "오디오 디코딩 실패 — 다른 형식(wav/mp3/m4a)으로 시도하세요.";
+    }
+    e.target.value = ""; // 같은 파일 재선택 허용
 });
 
 function startTranscript() {

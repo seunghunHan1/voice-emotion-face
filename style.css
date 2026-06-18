@@ -80,7 +80,8 @@ canvas { max-width: 100%; display: block; }
     font-size: 12px;
 }
 
-.row { display: flex; align-items: center; gap: 12px; }
+.row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.or-sep { color: var(--muted); font-size: 13px; }
 
 .btn {
     background: #262b38;
