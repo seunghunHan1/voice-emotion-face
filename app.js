@@ -243,6 +243,16 @@ let chunks = [];
 let recognition = null;
 let lastTranscript = "";
 
+// 보안 컨텍스트(https/localhost)가 아니면 마이크 불가 — 안내
+if (!window.isSecureContext) {
+    recordBtn.disabled = true;
+    recordBtn.title = "마이크는 https 또는 localhost에서만 동작합니다";
+    recStatus.innerHTML =
+        '⚠️ 현재 <b>http</b> 접속이라 마이크 녹음이 막혀 있어요. ' +
+        '음성 기능은 <code>localhost</code>나 https에서 사용하세요. ' +
+        '(사진 업로드 + 수동 감정 버튼은 그대로 동작)';
+}
+
 recordBtn.addEventListener("click", async () => {
     if (mediaRecorder && mediaRecorder.state === "recording") {
         mediaRecorder.stop();
