@@ -9,11 +9,23 @@
 </head>
 <body>
     <header class="topbar">
-        <h1>🎙️ 목소리로 사진 표정 바꾸기</h1>
-        <p class="subtitle">음성 → 감정 추정 → 얼굴 표정 변형 (브라우저 단일 데모)</p>
+        <div class="brand">
+            <span class="logo-orb"></span>
+            <div>
+                <h1>Emotion<span class="grad">Face</span> <span class="ai-tag">✨ AI</span></h1>
+                <p class="subtitle">목소리에서 감정을 읽어 사진 속 표정을 바꿉니다 · Voice → Emotion → Face</p>
+            </div>
+        </div>
+        <div class="pipeline-chips">
+            <span class="chip">🎙️ 음성</span>
+            <span class="chip-arrow">→</span>
+            <span class="chip">🧠 감정</span>
+            <span class="chip-arrow">→</span>
+            <span class="chip">🪄 표정</span>
+        </div>
     </header>
 
-    <details class="guide" open>
+    <details class="guide">
         <summary>📖 사용법 & 테스트 방법 (자세히)</summary>
         <div class="guide-body">
             <h3>처음 사용하는 순서</h3>
@@ -58,7 +70,7 @@
     <main class="layout">
         <!-- 1. 사진 -->
         <section class="panel">
-            <h2>1. 사진</h2>
+            <h2>사진</h2>
             <input type="file" id="photoInput" accept="image/*" />
             <p class="hint">정면 얼굴 사진이 가장 잘 됩니다.</p>
             <div class="canvas-wrap">
@@ -73,7 +85,7 @@
 
         <!-- 2. 음성 -->
         <section class="panel">
-            <h2>2. 목소리</h2>
+            <h2>목소리</h2>
             <p class="hint">마이크로 <b>녹음</b>하거나 오디오 <b>파일을 첨부</b>하세요. (둘 중 편한 방법)</p>
             <div class="row">
                 <button id="recordBtn" class="btn primary">● 녹음 시작</button>
@@ -102,13 +114,13 @@
 
         <!-- 3. 결과 -->
         <section class="panel">
-            <h2>3. 감정 & 표정</h2>
+            <h2>감정 & 표정</h2>
             <div id="emotionResult" class="emotion-result muted">아직 분석 전입니다.</div>
 
             <h3>표정 변경 방식</h3>
             <label class="radio"><input type="radio" name="faceEngine" value="geometric" /> 기하학 워핑 (즉시 · 오프라인 · 무료)</label>
             <label class="radio"><input type="radio" name="faceEngine" value="ai" checked /> AI 이미지 모델 (사실적 · OpenRouter, 수초 소요)</label>
-            <input type="text" id="orImageModel" placeholder="이미지 모델 (기본 google/gemini-2.5-flash-image)" style="width:100%;margin-top:6px;padding:7px 9px;background:#11141c;border:1px solid var(--border);border-radius:6px;color:var(--text)" />
+            <input type="text" id="orImageModel" placeholder="이미지 모델 (기본 google/gemini-2.5-flash-image)" />
             <p class="hint">AI 모드는 OpenRouter 키가 필요합니다(배포본·로컬엔 주입됨). 같은 사진·배경을 유지한 채 표정만 사실적으로 바꿉니다.</p>
             <div id="aiQuota" class="ai-quota"></div>
 
@@ -130,7 +142,7 @@
     </main>
 
     <footer class="footer">
-        <p>⚠️ 음성만으로 감정을 정확히 읽는 것은 본질적으로 불확실합니다. 표정 변형은 기하학적 근사(AU 기반)이며 데모 품질입니다.</p>
+        <p>⚠️ 음성만으로 감정을 정확히 읽는 것은 본질적으로 불확실합니다 · 표정 변형: AI 이미지 모델(사실적) 또는 기하학 워핑(즉시·오프라인) · Built with MediaPipe · OpenRouter</p>
     </footer>
 
     <script type="module" src="./app.js"></script>
