@@ -18,6 +18,7 @@ let baseLandmarks = null; // [{x,y}] 픽셀 좌표 (원본 기준)
 let triangles = null; // Delaunator triangle index array
 let faceWidth = 0; // 얼굴 가로 폭(px) — 변위 스케일 기준
 let landmarker = null;
+let imgSig = "default"; // 현재 사진 식별자 (캐시 키용)
 
 /* ---------- MediaPipe FaceLandmarker 로드 ---------- */
 async function initLandmarker() {
@@ -38,6 +39,7 @@ async function initLandmarker() {
 document.getElementById("photoInput").addEventListener("change", (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    imgSig = `${file.name}_${file.size}_${file.lastModified}`; // 사진별 캐시 키
     const img = new Image();
     img.onload = () => detectFace(img);
     img.src = URL.createObjectURL(file);
@@ -218,27 +220,74 @@ const AI_PROMPTS = {
     fear: "a fearful, scared expression: eyebrows raised and drawn together, widened tense eyes, tight mouth",
     neutral: "a calm neutral relaxed expression with no strong emotion",
 };
-const aiCache = new Map(); // label -> dataURL (사진 바뀌면 초기화)
+const AI_LIMIT = 10; // 브라우저당 AI 생성 최대 횟수
+const aiCache = new Map(); // label -> dataURL (세션 메모리, 사진 바뀌면 초기화)
 let aiBusy = false;
+
+/* --- 횟수 제한 (localStorage) --- */
+const aiCountGet = () => parseInt(localStorage.getItem("ve_ai_count") || "0", 10) || 0;
+const aiCountSet = (n) => localStorage.setItem("ve_ai_count", String(n));
+function updateQuotaUI() {
+    const el = document.getElementById("aiQuota");
+    if (!el) return;
+    const used = aiCountGet();
+    const left = Math.max(0, AI_LIMIT - used);
+    el.textContent = `AI 표정 생성: ${used}/${AI_LIMIT} 사용 (남은 ${left}회) · 캐시된 표정은 무제한`;
+    el.classList.toggle("quota-empty", left <= 0);
+}
+
+/* --- 캐싱 (메모리 → localStorage 영구) --- */
+const cacheKey = (emotion) => `ve_aiimg_${imgSig}_${emotion}`;
+function getCachedAI(emotion) {
+    if (aiCache.has(emotion)) return aiCache.get(emotion);
+    try {
+        const v = localStorage.getItem(cacheKey(emotion));
+        if (v) { aiCache.set(emotion, v); return v; }
+    } catch (_) {}
+    return null;
+}
+function setCachedAI(emotion, url) {
+    aiCache.set(emotion, url);
+    try { localStorage.setItem(cacheKey(emotion), url); } catch (_) { /* 용량 초과 시 메모리 캐시만 */ }
+}
+
+/* --- 로딩 오버레이 / 컨트롤 잠금 --- */
+function setBusyUI(on) {
+    document.getElementById("aiLoading")?.classList.toggle("hidden", !on);
+    document.querySelectorAll(".btn.emo").forEach((b) => (b.disabled = on));
+    recordBtn.disabled = on;
+}
 
 async function applyEmotionAI(emotion) {
     const key = (document.getElementById("orKey").value || "").trim();
     if (!key) {
-        alert("AI 표정 모드는 OpenRouter 키가 필요합니다. 휴리스틱 기하학 워핑으로 대체합니다.");
+        alert("AI 표정 모드는 OpenRouter 키가 필요합니다. 기하학 워핑으로 대체합니다.");
         applyEmotionGeometric(emotion, +document.getElementById("intensity").value);
         return;
     }
     if (aiBusy) return;
 
-    // 캐시 히트면 즉시
-    if (aiCache.has(emotion)) {
-        await drawDataUrl(aiCache.get(emotion));
-        faceStatus.textContent = `AI 표정 적용: ${emotion} (캐시)`;
+    // 1) 캐시 히트 → 즉시, 횟수 차감 없음
+    const cached = getCachedAI(emotion);
+    if (cached) {
+        await drawDataUrl(cached);
+        faceStatus.textContent = `AI 표정 적용: ${emotion} (캐시, 무료)`;
         return;
     }
 
+    // 2) 횟수 제한 확인
+    const used = aiCountGet();
+    if (used >= AI_LIMIT) {
+        faceStatus.textContent = `AI 생성 한도(${AI_LIMIT}회) 초과 — 기하학 워핑으로 대체`;
+        alert(`AI 표정 생성은 최대 ${AI_LIMIT}번까지예요. 이미 만든 표정(캐시)은 계속 무료로 볼 수 있고, 기하학 워핑은 무제한입니다.`);
+        applyEmotionGeometric(emotion, +document.getElementById("intensity").value);
+        return;
+    }
+
+    // 3) 생성
     aiBusy = true;
-    faceStatus.textContent = "🎨 AI가 표정 생성 중... (수초)";
+    setBusyUI(true);
+    faceStatus.textContent = "🎨 AI가 표정 생성 중...";
     const model = (document.getElementById("orImageModel").value || "").trim() || "google/gemini-2.5-flash-image";
     const prompt =
         `Edit ONLY the facial expression of the person in this photo to show ${AI_PROMPTS[emotion] || "a neutral expression"}. ` +
@@ -266,15 +315,20 @@ async function applyEmotionAI(emotion) {
         const imgs = json.choices?.[0]?.message?.images || [];
         const url = imgs[0]?.image_url?.url;
         if (!url) throw new Error("모델이 이미지를 반환하지 않았습니다.");
-        aiCache.set(emotion, url);
+
         await drawDataUrl(url);
-        faceStatus.textContent = `AI 표정 적용 완료: ${emotion}`;
+        // 캐시는 축소된 캔버스 JPEG로 저장(용량 절약), 횟수 1 차감
+        setCachedAI(emotion, canvas.toDataURL("image/jpeg", 0.85));
+        aiCountSet(used + 1);
+        updateQuotaUI();
+        faceStatus.textContent = `AI 표정 적용 완료: ${emotion} (남은 ${AI_LIMIT - used - 1}회)`;
     } catch (err) {
         console.error(err);
         faceStatus.textContent = "AI 생성 실패 — 기하학 워핑으로 대체";
         applyEmotionGeometric(emotion, +document.getElementById("intensity").value);
     } finally {
         aiBusy = false;
+        setBusyUI(false);
     }
 }
 
@@ -647,3 +701,4 @@ async function restoreConfig() {
     }
 }
 restoreConfig();
+updateQuotaUI();

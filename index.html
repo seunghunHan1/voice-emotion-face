@@ -64,6 +64,10 @@
             <div class="canvas-wrap">
                 <canvas id="canvas"></canvas>
                 <div id="faceStatus" class="badge">사진을 올려주세요</div>
+                <div id="aiLoading" class="ai-loading hidden">
+                    <div class="spinner"></div>
+                    <span>AI가 표정 생성 중...</span>
+                </div>
             </div>
         </section>
 
@@ -106,6 +110,7 @@
             <label class="radio"><input type="radio" name="faceEngine" value="ai" checked /> AI 이미지 모델 (사실적 · OpenRouter, 수초 소요)</label>
             <input type="text" id="orImageModel" placeholder="이미지 모델 (기본 google/gemini-2.5-flash-image)" style="width:100%;margin-top:6px;padding:7px 9px;background:#11141c;border:1px solid var(--border);border-radius:6px;color:var(--text)" />
             <p class="hint">AI 모드는 OpenRouter 키가 필요합니다(배포본·로컬엔 주입됨). 같은 사진·배경을 유지한 채 표정만 사실적으로 바꿉니다.</p>
+            <div id="aiQuota" class="ai-quota"></div>
 
             <h3>수동 테스트</h3>
             <p class="hint">음성 없이 표정 변형만 바로 확인할 수 있습니다.</p>
