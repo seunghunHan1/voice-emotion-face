@@ -52,6 +52,7 @@ async function detectFace(img) {
     canvas.height = Math.round(img.height * scale);
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     baseImage = img;
+    aiCache.clear(); // 새 사진이면 AI 결과 캐시 초기화
 
     if (!landmarker) {
         try {
@@ -171,10 +172,24 @@ function emotionField(emotion, intensity) {
     return m;
 }
 
-// 변위 적용 → 워핑 렌더
-function applyEmotion(emotion, intensity) {
-    if (!baseLandmarks || !triangles) {
+// 표정 변경 디스패처 — 기하학 워핑 / AI 이미지 모델
+async function applyEmotion(emotion, intensity) {
+    if (!baseImage) {
         faceStatus.textContent = "먼저 얼굴이 인식된 사진이 필요합니다.";
+        return;
+    }
+    const engine = document.querySelector('input[name="faceEngine"]:checked')?.value || "geometric";
+    if (engine === "ai") {
+        await applyEmotionAI(emotion);
+    } else {
+        applyEmotionGeometric(emotion, intensity);
+    }
+}
+
+// 변위 적용 → 워핑 렌더 (기하학)
+function applyEmotionGeometric(emotion, intensity) {
+    if (!baseLandmarks || !triangles) {
+        faceStatus.textContent = "기하학 모드는 얼굴 랜드마크가 필요합니다. (AI 모드를 쓰거나 정면 사진으로)";
         return;
     }
     const field = emotionField(emotion, intensity);
@@ -192,6 +207,100 @@ function applyEmotion(emotion, intensity) {
             [dst[a], dst[b], dst[c]]
         );
     }
+}
+
+/* ---------- AI 이미지 모델 표정 편집 (OpenRouter) ---------- */
+const AI_PROMPTS = {
+    happy: "a big genuine happy smile with raised mouth corners and smiling (slightly crinkled) eyes",
+    sad: "a sad sorrowful expression: downturned mouth corners, slightly raised inner eyebrows, droopy eyes",
+    angry: "an angry expression: eyebrows furrowed and pulled together and down, tense pressed mouth, glaring eyes",
+    surprise: "a surprised expression: eyebrows raised high, eyes wide open, mouth slightly open",
+    fear: "a fearful, scared expression: eyebrows raised and drawn together, widened tense eyes, tight mouth",
+    neutral: "a calm neutral relaxed expression with no strong emotion",
+};
+const aiCache = new Map(); // label -> dataURL (사진 바뀌면 초기화)
+let aiBusy = false;
+
+async function applyEmotionAI(emotion) {
+    const key = (document.getElementById("orKey").value || "").trim();
+    if (!key) {
+        alert("AI 표정 모드는 OpenRouter 키가 필요합니다. 휴리스틱 기하학 워핑으로 대체합니다.");
+        applyEmotionGeometric(emotion, +document.getElementById("intensity").value);
+        return;
+    }
+    if (aiBusy) return;
+
+    // 캐시 히트면 즉시
+    if (aiCache.has(emotion)) {
+        await drawDataUrl(aiCache.get(emotion));
+        faceStatus.textContent = `AI 표정 적용: ${emotion} (캐시)`;
+        return;
+    }
+
+    aiBusy = true;
+    faceStatus.textContent = "🎨 AI가 표정 생성 중... (수초)";
+    const model = (document.getElementById("orImageModel").value || "").trim() || "google/gemini-2.5-flash-image";
+    const prompt =
+        `Edit ONLY the facial expression of the person in this photo to show ${AI_PROMPTS[emotion] || "a neutral expression"}. ` +
+        "Keep the same identity, face shape, pose, hairstyle, clothing, lighting and background completely unchanged. " +
+        "Photorealistic result, change nothing except the facial expression.";
+
+    try {
+        const srcDataUrl = await toJpegDataUrl(baseImage);
+        const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+            body: JSON.stringify({
+                model,
+                modalities: ["image", "text"],
+                messages: [
+                    { role: "user", content: [
+                        { type: "text", text: prompt },
+                        { type: "image_url", image_url: { url: srcDataUrl } },
+                    ] },
+                ],
+            }),
+        });
+        const json = await res.json();
+        if (json.error) throw new Error(json.error.message || JSON.stringify(json.error));
+        const imgs = json.choices?.[0]?.message?.images || [];
+        const url = imgs[0]?.image_url?.url;
+        if (!url) throw new Error("모델이 이미지를 반환하지 않았습니다.");
+        aiCache.set(emotion, url);
+        await drawDataUrl(url);
+        faceStatus.textContent = `AI 표정 적용 완료: ${emotion}`;
+    } catch (err) {
+        console.error(err);
+        faceStatus.textContent = "AI 생성 실패 — 기하학 워핑으로 대체";
+        applyEmotionGeometric(emotion, +document.getElementById("intensity").value);
+    } finally {
+        aiBusy = false;
+    }
+}
+
+// 원본 이미지를 캔버스 크기와 동일 비율의 jpeg dataURL로
+function toJpegDataUrl(img) {
+    const off = document.createElement("canvas");
+    const maxW = 768;
+    const scale = Math.min(1, maxW / img.width);
+    off.width = Math.round(img.width * scale);
+    off.height = Math.round(img.height * scale);
+    off.getContext("2d").drawImage(img, 0, 0, off.width, off.height);
+    return Promise.resolve(off.toDataURL("image/jpeg", 0.92));
+}
+
+// dataURL을 현재 캔버스 크기에 맞춰 그림 (랜드마크 좌표계 유지)
+function drawDataUrl(url) {
+    return new Promise((resolve) => {
+        const im = new Image();
+        im.onload = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(im, 0, 0, canvas.width, canvas.height);
+            resolve();
+        };
+        im.onerror = () => resolve();
+        im.src = url;
+    });
 }
 
 // 한 삼각형을 src→dst 아핀 변환으로 텍스처 매핑
@@ -356,7 +465,7 @@ async function analyzeAudio(blob) {
     }
     recStatus.textContent = "완료";
     showEmotion(emo);
-    applyEmotion(emo.label, emo.intensity);
+    await applyEmotion(emo.label, emo.intensity);
 }
 
 // 오디오버퍼 → 운율 특징

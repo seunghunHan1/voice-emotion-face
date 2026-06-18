@@ -101,6 +101,12 @@
             <h2>3. 감정 & 표정</h2>
             <div id="emotionResult" class="emotion-result muted">아직 분석 전입니다.</div>
 
+            <h3>표정 변경 방식</h3>
+            <label class="radio"><input type="radio" name="faceEngine" value="geometric" /> 기하학 워핑 (즉시 · 오프라인 · 무료)</label>
+            <label class="radio"><input type="radio" name="faceEngine" value="ai" checked /> AI 이미지 모델 (사실적 · OpenRouter, 수초 소요)</label>
+            <input type="text" id="orImageModel" placeholder="이미지 모델 (기본 google/gemini-2.5-flash-image)" style="width:100%;margin-top:6px;padding:7px 9px;background:#11141c;border:1px solid var(--border);border-radius:6px;color:var(--text)" />
+            <p class="hint">AI 모드는 OpenRouter 키가 필요합니다(배포본·로컬엔 주입됨). 같은 사진·배경을 유지한 채 표정만 사실적으로 바꿉니다.</p>
+
             <h3>수동 테스트</h3>
             <p class="hint">음성 없이 표정 변형만 바로 확인할 수 있습니다.</p>
             <div class="emo-buttons">
