@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>목소리로 표정 바꾸기 — Voice → Emotion → Face</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎙️</text></svg>" />
+    <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+    <header class="topbar">
+        <h1>🎙️ 목소리로 사진 표정 바꾸기</h1>
+        <p class="subtitle">음성 → 감정 추정 → 얼굴 표정 변형 (브라우저 단일 데모)</p>
+    </header>
+
+    <details class="guide" open>
+        <summary>📖 사용법 & 테스트 방법 (자세히)</summary>
+        <div class="guide-body">
+            <h3>처음 사용하는 순서</h3>
+            <ol>
+                <li><b>사진 올리기</b> — ①번 패널에서 <b>정면 얼굴</b> 사진을 선택합니다. "얼굴 인식 완료"가 뜨면 준비 끝.
+                    (배지에 "얼굴을 못 찾았어요"가 뜨면 더 정면·고해상도 사진으로 교체)</li>
+                <li><b>표정만 먼저 테스트</b> — ③번 패널의 <b>😊😢😠😮😨😐 버튼</b>을 눌러보세요.
+                    음성 없이도 사진 표정이 즉시 바뀝니다. <b>강도 슬라이더</b>로 변형 세기를 조절합니다.</li>
+                <li><b>목소리로 테스트</b> — ②번 패널의 <b>● 녹음 시작</b> → 2~4초 또렷하게 말하기 → <b>■ 녹음 중지</b>.
+                    추출된 운율 특징(피치·에너지·말속도)과 추정 감정이 ③번에 표시되고 사진 표정이 바뀝니다.</li>
+            </ol>
+
+            <h3>감정 인식 방식 두 가지</h3>
+            <ul>
+                <li><b>로컬 휴리스틱</b>(기본) — 키 불필요, 즉시 동작. 피치/에너지/말속도를 규칙으로 valence·arousal에 매핑.</li>
+                <li><b>OpenRouter LLM</b> — ②번 "감정 인식 방식"을 펼쳐 API 키 입력. 음향 특징(+선택: 말 내용)을 LLM이 판단해 더 똑똑함.
+                    공개 배포본에는 키가 없으니 <b>본인 키를 직접 붙여넣어야</b> 동작합니다(브라우저에만 저장).</li>
+            </ul>
+
+            <h3>감정별로 확인할 포인트 (수동 버튼 기준)</h3>
+            <ul>
+                <li>😊 기쁨 — 입꼬리가 위·바깥으로 올라감</li>
+                <li>😢 슬픔 — 입꼬리 내려가고 눈썹 안쪽이 올라감</li>
+                <li>😠 분노 — 눈썹 안쪽이 아래·중앙으로 모임(찌푸림)</li>
+                <li>😮 놀람 — 눈썹 전체 올라가고 눈·입이 벌어짐</li>
+                <li>😨 공포 — 눈썹 올라가며 모이고 눈이 커짐</li>
+                <li>😐 중립 — 원본으로 복귀</li>
+            </ul>
+
+            <h3>잘 안 될 때</h3>
+            <ul>
+                <li><b>마이크 권한</b>: 브라우저가 마이크를 요청하면 허용. 거부 시 녹음 불가.</li>
+                <li><b>보안 컨텍스트</b>: 마이크·모델 로딩은 <code>https://</code> 또는 <code>localhost</code>에서만 동작합니다.</li>
+                <li><b>얼굴 인식 모델</b>은 최초 1회 CDN에서 내려받습니다(네트워크 필요).</li>
+                <li>음성만으로의 감정 추정은 본질적으로 불확실합니다 — 표정은 기하학적 근사(AU 기반) 데모입니다.</li>
+            </ul>
+        </div>
+    </details>
+
+    <main class="layout">
+        <!-- 1. 사진 -->
+        <section class="panel">
+            <h2>1. 사진</h2>
+            <input type="file" id="photoInput" accept="image/*" />
+            <p class="hint">정면 얼굴 사진이 가장 잘 됩니다.</p>
+            <div class="canvas-wrap">
+                <canvas id="canvas"></canvas>
+                <div id="faceStatus" class="badge">사진을 올려주세요</div>
+            </div>
+        </section>
+
+        <!-- 2. 음성 -->
+        <section class="panel">
+            <h2>2. 목소리</h2>
+            <div class="row">
+                <button id="recordBtn" class="btn primary">● 녹음 시작</button>
+                <span id="recStatus" class="muted">대기 중</span>
+            </div>
+            <div class="meter"><div id="level" class="meter-fill"></div></div>
+
+            <details class="opts">
+                <summary>감정 인식 방식</summary>
+                <label class="radio"><input type="radio" name="engine" value="heuristic" checked /> 로컬 휴리스틱 (즉시, 키 불필요)</label>
+                <label class="radio"><input type="radio" name="engine" value="openrouter" /> OpenRouter LLM (더 똑똑함, API 키 필요)</label>
+
+                <div id="orBox" class="orbox hidden">
+                    <input type="password" id="orKey" placeholder="OpenRouter API Key (sk-or-...)" />
+                    <input type="text" id="orModel" placeholder="모델 (예: google/gemini-2.0-flash-001)" />
+                    <label class="check"><input type="checkbox" id="useTranscript" /> 말 내용도 함께 인식(Web Speech, Chrome 권장)</label>
+                    <p class="hint">키는 이 브라우저(localStorage)에만 저장됩니다. 데모용이며 키 노출에 주의하세요.</p>
+                </div>
+            </details>
+
+            <div id="features" class="features muted"></div>
+        </section>
+
+        <!-- 3. 결과 -->
+        <section class="panel">
+            <h2>3. 감정 & 표정</h2>
+            <div id="emotionResult" class="emotion-result muted">아직 분석 전입니다.</div>
+
+            <h3>수동 테스트</h3>
+            <p class="hint">음성 없이 표정 변형만 바로 확인할 수 있습니다.</p>
+            <div class="emo-buttons">
+                <button class="btn emo" data-emo="happy">😊 기쁨</button>
+                <button class="btn emo" data-emo="sad">😢 슬픔</button>
+                <button class="btn emo" data-emo="angry">😠 분노</button>
+                <button class="btn emo" data-emo="surprise">😮 놀람</button>
+                <button class="btn emo" data-emo="fear">😨 공포</button>
+                <button class="btn emo" data-emo="neutral">😐 중립</button>
+            </div>
+            <label class="slider-row">강도
+                <input type="range" id="intensity" min="0" max="1" step="0.05" value="0.8" />
+                <span id="intensityVal">0.80</span>
+            </label>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <p>⚠️ 음성만으로 감정을 정확히 읽는 것은 본질적으로 불확실합니다. 표정 변형은 기하학적 근사(AU 기반)이며 데모 품질입니다.</p>
+    </footer>
+
+    <script type="module" src="./app.js"></script>
+</body>
+</html>
